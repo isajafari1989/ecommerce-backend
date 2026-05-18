@@ -23,13 +23,30 @@ public class ProductRepository : IProductRepository
 
 	public async Task<IEnumerable<Product>> GetAllAsync()
 	{
-		return await _context.Products.ToListAsync();
+		return await _context.Products
+			.AsNoTracking()
+			.Where(p => p.IsActive)
+			.ToListAsync();
 	}
 
 	public async Task<PaginatedResult<Product>> GetPaginatedAsync(ProductQueryParametersDto parameters)
 	{
-		var query = _context.Products.AsQueryable();
+		var query = _context.Products
+			.AsNoTracking()
+			.Where(p => p.IsActive)
+			.AsQueryable();
 		
+		// Keyword search
+		if (!string.IsNullOrWhiteSpace(parameters.Search))
+		{
+			var search = parameters.Search.ToLower();
+
+			query = query.Where(p =>
+				p.Name.ToLower().Contains(search) ||
+				p.Description.ToLower().Contains(search) ||
+				p.SKU.ToLower().Contains(search));
+		}
+
 		//Filtering
 		if (parameters.MinPrice.HasValue)
 			query = query.Where(p => p.Price >= parameters.MinPrice.Value);

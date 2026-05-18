@@ -2,6 +2,11 @@ namespace ECommerce.Application.DTOs.Products;
 
 public class ProductQueryParametersDto
 {
+    /// <summary>
+    /// Keyword used to search product name, description, or SKU.
+    /// </summary>
+    public string? Search { get; set; }
+    
     public int PageNumber { get; set; } = 1;
     public int PageSize { get; set; } = 10;
     
