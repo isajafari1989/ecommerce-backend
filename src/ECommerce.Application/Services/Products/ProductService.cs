@@ -90,8 +90,11 @@ public class ProductService : IProductService
 
             return _mapper.Map<ProductDto>(product);
         }
-        public async Task<ProductDto?> UpdateProductAsync(int id, UpdateProductDto dto, Guid sellerId)
+        public async Task<ProductDto?> UpdateProductAsync(int id, UpdateProductDto dto)
         {
+            var sellerId = _currentUser.UserId
+                           ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
             var product = await _repository.GetByIdAsync(id);
             if (product == null)
                 throw new NotFoundException($"Product with ID {id} not found.");
