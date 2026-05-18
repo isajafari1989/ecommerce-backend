@@ -110,8 +110,7 @@ namespace ECommerce.Api.Controllers;
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateProductDto dto)
         {
-	        var sellerId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-	        var product = await _productService.UpdateProductAsync(id, dto, sellerId);
+	        var product = await _productService.UpdateProductAsync(id, dto);
             if (product == null)
                 return NotFound($"Product with ID {id} not found.");
 
