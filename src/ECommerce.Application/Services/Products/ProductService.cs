@@ -1,5 +1,5 @@
 
-
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ECommerce.Application.DTOs.Products;
@@ -21,14 +21,22 @@ public class ProductService : IProductService
         private readonly ICurrentUserService _currentUser;
         private readonly IUserRepository _userRepository;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ILogger<ProductService> _logger;
 
-        public ProductService(IProductRepository repository, IMapper mapper, ICurrentUserService currentUser, IUserRepository userRepository, IUnitOfWork unitOfWork)
+        public ProductService(
+            IProductRepository repository,
+            IMapper mapper,
+            ICurrentUserService currentUser,
+            IUserRepository userRepository,
+            IUnitOfWork unitOfWork,
+            ILogger<ProductService> logger)
         {
             _repository = repository;
 			_mapper = mapper;
             _currentUser = currentUser;
             _userRepository = userRepository;
             _unitOfWork = unitOfWork;
+            _logger = logger;
         }
 
         public async Task<IEnumerable<ProductDto>> GetAllProductsAsync()
@@ -63,7 +71,6 @@ public class ProductService : IProductService
         {
             var sellerId = _currentUser.UserId
                            ?? throw new UnauthorizedAccessException("User is not authenticated.");
-
             // 1️⃣ Validate seller exists
             var sellerExists = await _userRepository.ExistsAsync(sellerId);
             if (!sellerExists)
@@ -87,6 +94,8 @@ public class ProductService : IProductService
 
             await _repository.AddAsync(product);
             await _unitOfWork.SaveChangesAsync();
+            
+            _logger.LogInformation("User {SellerId} created product {SKU}.", sellerId, dto.SKU);
 
             return _mapper.Map<ProductDto>(product);
         }
@@ -95,27 +104,53 @@ public class ProductService : IProductService
             var sellerId = _currentUser.UserId
                            ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
+            _logger.LogInformation("User {SellerId} attempting to update product {ProductId}", sellerId, id);
+
             var product = await _repository.GetByIdAsync(id);
+
             if (product == null)
+            {
+                _logger.LogWarning("Product {ProductId} not found for Seller {SellerId}", id, sellerId);
                 throw new NotFoundException($"Product with ID {id} not found.");
-            
+            }
+
             if (product.SellerId != sellerId)
-                throw new UnauthorizedAccessException("You do not own this product.");
+                {
+                    _logger.LogWarning("Unauthorized update attempt by {{SellerId}} on product{ProductId}", sellerId, id);
+                    throw new UnauthorizedAccessException("You do not own this product.");
+                }
 
             _mapper.Map(dto, product);
 
             await _repository.UpdateAsync(product);
             await _unitOfWork.SaveChangesAsync();
 
+            _logger.LogInformation("User {SellerId} successfully updated product {ProductId}", sellerId, id);
+
             return _mapper.Map<ProductDto>(product);
         }
 
         public async Task<bool> DeleteProductAsync(int id)
         {
-            var product = await _repository.GetByIdAsync(id);
-            if (product == null)
-                throw new NotFoundException($"Product with ID {id} not found.");
+            
+            var sellerId = _currentUser.UserId
+                           ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
+            var product = await _repository.GetByIdAsync(id);
+            
+            //check if product exists
+            if (product == null)
+                throw new NotFoundException("Product with ID {id} not found.");
+            
+            //security check: ownership
+            if (product.SellerId != sellerId)
+            {
+                _logger.LogWarning("Unauthorized delete attempt by user {SellerId} on product {ProductId}", sellerId, id);
+                throw new UnauthorizedAccessException("You do not have permission to delete this product.");
+
+            }
+                
+            //Delete
             await _repository.DeleteAsync(product);
             await _unitOfWork.SaveChangesAsync();
             return true;
