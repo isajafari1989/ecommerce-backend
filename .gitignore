@@ -4,6 +4,16 @@ obj/
 .idea/
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
 *.cache
 *.log
+.DS_Store
+**/.DS_Store
+Thumbs.db
 appsettings.Development.json
+appsettings.*.local.json
+.env
+.env.*
+*.pfx
+secrets.json

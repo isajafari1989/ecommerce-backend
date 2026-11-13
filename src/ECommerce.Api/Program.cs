@@ -1,5 +1,6 @@
 using ECommerce.Application;
 using ECommerce.Infrastructure;
+using ECommerce.Infrastructure.Configuration;
 using ECommerce.Infrastructure.Persistence;
 using ECommerce.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +19,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
-builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+var jwtSettings = JwtSettingsConfiguration.GetRequired(builder.Configuration);
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "Connection string 'DefaultConnection' is not configured. " +
+        "Set ConnectionStrings:DefaultConnection in configuration or the ConnectionStrings__DefaultConnection environment variable.");
+}
+
+builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
 builder.Services.AddTransient<ExceptionHandlingMiddleware>();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure();
@@ -27,18 +38,16 @@ builder.Services
     .AddAuthentication("Bearer")
     .AddJwtBearer(options =>
     {
-        var config = builder.Configuration.GetSection("JwtSettings");
-
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = config["Issuer"],
-            ValidAudience = config["Audience"],
+            ValidIssuer = jwtSettings.Issuer,
+            ValidAudience = jwtSettings.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(config["Key"])
+                Encoding.UTF8.GetBytes(jwtSettings.Key)
             )
         };
     });
@@ -101,7 +110,7 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await context.Database.MigrateAsync();
-    await DbSeeder.SeedAdminUserAsync(context);
+    await DbSeeder.SeedAdminUserAsync(context, app.Configuration);
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();

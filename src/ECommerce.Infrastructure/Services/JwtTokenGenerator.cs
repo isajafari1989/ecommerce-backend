@@ -8,6 +8,7 @@ using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using ECommerce.Domain.Entities;
 using ECommerce.Application.Interfaces;
+using ECommerce.Infrastructure.Configuration;
 
 
 
@@ -22,7 +23,7 @@ public class JwtTokenGenerator : IJwtTokenGenerator
 
     public string GenerateToken(User user)
     {
-        var jwtSettings = _config.GetSection("JwtSettings");
+        var jwtSettings = JwtSettingsConfiguration.GetRequired(_config);
 
         var claims = new[]
         {
@@ -31,14 +32,14 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             new Claim(ClaimTypes.Role, user.Role)
         };
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
-            issuer: jwtSettings["Issuer"],
-            audience: jwtSettings["Audience"],
+            issuer: jwtSettings.Issuer,
+            audience: jwtSettings.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(int.Parse(jwtSettings["ExpiresInMinutes"])),
+            expires: DateTime.UtcNow.AddMinutes(jwtSettings.ExpiresInMinutes),
             signingCredentials: creds
         );
 
